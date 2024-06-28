@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block styles %}
+  <style>
+    .modal-alpine {
+      position: fixed;
+      z-index: 999;
+      left: 0;
+      top: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-alpine-content {
+      background-color: white;
+      border-radius: 5px;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div x-data="getData()">
+  <!-- Filters section start -->
+  <div class="container-sm">
+    <div class="row">
+      <div class="col-10">
+        <form id="filterForm" @submit.prevent="applyFilters()">
+          <div class="row mb-3">
+            <div class="col">
+              <label for="filterName" class="form-label">Name</label>
+              <input type="text" class="form-control" id="filterName" x-model="filters.name__icontains" placeholder="Enter name">
+            </div>
+            <div class="col">
+              <label for="filterAddress" class="form-label">Address</label>
+              <input type="text" class="form-control" id="filterAddress" x-model="filters.address__icontains" placeholder="Enter address">
+            </div>
+            <div class="col">
+              <label for="filterCity" class="form-label">City</label>
+              <input type="text" class="form-control" id="filterCity" x-model="filters.city__icontains" placeholder="Enter city">
+            </div>
+            <div class="col">
+              <label for="filterCountry" class="form-label">Country</label>
+              <input type="text" class="form-control" id="filterCountry" x-model="filters.country__icontains" placeholder="Enter country">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <div class="col">
+              <label for="filterPostalCode" class="form-label">Postal Code</label>
+              <input type="text" class="form-control" id="filterPostalCode" x-model="filters.postal_code__icontains" placeholder="Enter postal code">
+            </div>
+            <div class="col">
+              <label for="filterType" class="form-label">Type</label>
+              <select class="form-control" id="filterType" x-model="filters.type__exact">
+                <option value="">Pick a type</option>
+                {% for type in property_types %}
+                  <option value="{{ type.id }}">{{ type.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col">
+              <label for="filterAreaGte" class="form-label">Min Area</label>
+              <input type="text" class="form-control" id="filterAreaGte" x-model="filters.area__gte" placeholder="Min area in m^2">
+            </div>
+            <div class="col">
+              <label for="filterAreaLte" class="form-label">Max Area</label>
+              <input type="text" class="form-control" id="filterAreaLte" x-model="filters.area__lte" placeholder="Max area in m^2">
+            </div>
+          </div>
+          <div class="d-flex justify-content-center">
+            <button type="submit" class="btn btn-primary me-4" @click="applyFilters()">Apply Filters</button>
+            <button type="button" class="btn btn-secondary" @click="clearFilters()">Clear Filters</button>
+          </div>
+        </form>
+      </div>
+      <div class="d-flex justify-content-end align-items-center col-2">
+        <button type="button" class="btn btn-success py-3" @click="creating = true">
+          <i class="fas fa-plus"></i> Create
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- Filters section end -->
+
+  <div class="container-sm mt-3">
+    <ul class="list-group d-grid">
+      {% for property in properties %}
+        <li class="list-group-item bg-light border d-flex align-middle">
+          <div class="col-8 d-flex justify-content-center">
+            <h4 class="text-center">{{property.name}}</h4>
+          </div>
+          <div class="col-4">
+            <div class="d-flex justify-content-around">
+              <button type="button" class="btn btn-primary"
+                @click="showPropertyDetails({{property.id}})">
+                <i class="fas fa-eye"></i> Details
+              </button>
+              <button type="button" class="btn btn-secondary"
+                @click="editProperty({{property.id}})">
+                <i class="fas fa-file-pen"></i> Edit
+              </button>
+              <button type="button" class="btn btn-danger"
+                @click="deleteProperty({{property.id}})">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!--View details modal start-->
+  <div x-show="showingDetails || creating || editing">
+    <div class="modal-alpine d-flex align-items-center justify-content-center vh-100 vw-100">
+      <div class="modal-alpine-content p-3 col-4 text-center p-5">
+        <div x-show="showingDetails">
+          <h2 class="mb-3" x-text="selectedProperty?.name"></h2>
+          <p><strong>Type:</strong> <span x-text="selectedProperty?.type"></span></p>
+          <p><strong>Address:</strong> <span x-text="selectedProperty?.address"></span></p>
+          <p><strong>City:</strong> <span x-text="selectedProperty?.city"></span></p>
+          <p><strong>Country:</strong> <span x-text="selectedProperty?.country"></span></p>
+          <p><strong>Postal Code:</strong> <span x-text="selectedProperty?.postal_code"></span></p>
+          <p><strong>Area:</strong> <span x-text="selectedProperty?.area"></span></p>
+        </div>
+
+        <div x-show="creating || editing">
+          <form @submit.prevent="saveProperty()">
+            <h2 class="mb-3">Create New Property</h2>
+            <div class="row mb-3">
+              <div class="col">
+                <div>
+                  <label for="propertyType" class="form-label">Property Type</label>
+                  <select id="propertyType" name="property_type" class="form-select" x-model="newProperty.type">
+                    {% for type in property_types %}
+                      <option value="{{ type.id }}">{{ type.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col">
+                <div>
+                  <label for="propertyName" class="form-label">Property Name</label>
+                  <input type="text" class="form-control text-center" id="propertyName" placeholder="Enter property name" x-model="newProperty.name" required>
+                </div>
+              </div>
+              <div class="col">
+                <div>
+                  <label for="propertyAddress" class="form-label">Address</label>
+                  <input type="text" class="form-control text-center" id="propertyAddress" placeholder="Enter address" x-model="newProperty.address" required>
+                </div>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col">
+                <div>
+                  <label for="propertyCity" class="form-label">City</label>
+                  <input type="text" class="form-control text-center" id="propertyCity" placeholder="Enter city" x-model="newProperty.city" required>
+                </div>
+              </div>
+              <div class="col">
+                <div>
+                  <label for="propertyCountry" class="form-label">Country</label>
+                  <input type="text" class="form-control text-center" id="propertyCountry" placeholder="Enter country" x-model="newProperty.country" required>
+                </div>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col">
+                <div>
+                  <label for="propertyPostalCode" class="form-label">Postal Code</label>
+                  <input type="text" class="form-control text-center" id="propertyPostalCode" placeholder="Enter postal code" x-model="newProperty.postal_code" required>
+                </div>
+              </div>
+              <div class="col">
+                <div>
+                  <label for="propertyArea" class="form-label">Area</label>
+                  <input type="text" class="form-control text-center" id="propertyArea" placeholder="Enter area in square meters" x-model="newProperty.area" required>
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Save Property</button>
+          </form>
+        </div>
+
+        <button @click="showingDetails = false; creating = false; editing = false; selectedProperty = null" class="btn btn-secondary mt-3">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+  <!--View details modal end-->
+</div>
+{% endblock content %}
+
+{% block scripts %}
+  <script>
+    const properties = {{ properties|safe }};
+    let propertyTypes = {{ property_types|safe }};
+    const currentFilters = {{ filters|safe }};
+
+    // transform the array into an object to facilitate access to the data
+    propertyTypes = propertyTypes.reduce((acc, current) => {
+      acc[current.id] = current;
+      return acc;
+    }, {});
+
+    function getData() {
+      const initialFilters = {
+        name__icontains: '',
+        address__icontains: '',
+        city__icontains: '',
+        country__icontains: '',
+        postal_code__icontains: '',
+        area__gte: '',
+        area__lte: '',
+        type__exact: ''
+      }
+
+      Object.entries(currentFilters).forEach(([key, value]) => {
+        initialFilters[key] = value;
+      });
+
+      return {
+        showingDetails: false,
+        creating: false,
+        editing: false,
+        selectedProperty: null,
+        propertyTypes,
+        newProperty: {
+          name: 'prueba',
+          type: 2,
+          address: 'calle',
+          city: 'la plata',
+          country: 'colombia',
+          postal_code: '68002',
+          area: 500
+        },
+        showPropertyDetails(id) {
+          this.showingDetails = true;
+          this.selectedProperty = properties.find(property => property.id === id);
+          this.selectedProperty['type'] = this.propertyTypes[this.selectedProperty.type]?.name;
+        },
+        createProperty() {
+          this.creating = true;
+        },
+        editProperty(id) {
+          this.editing = true;
+          this.newProperty = properties.find(property => property.id === id);
+          console.log(this.newProperty);
+        },
+        deleteProperty(id) {
+          fetch(`/real-state-api/properties/${id}/`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(this.newProperty)
+          }).then(data => {
+            location.reload();
+          }).catch(error => {
+            console.error('An error occurred while deleting the property', error);
+          }).finally(() => {
+            this.editing = false;
+          });
+        },
+        saveProperty() {
+          if (this.creating) {
+            fetch('/real-state-api/properties/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(this.newProperty)
+            }).then(data => {
+              location.reload();
+            }).catch(error => {
+              console.error('An error occurred while creating the property', error);
+            }).finally(() => {
+              this.creating = false;
+            });
+          }
+
+          if (this.editing) {
+            fetch(`/real-state-api/properties/${this.newProperty.id}/`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(this.newProperty)
+            }).then(data => {
+              location.reload();
+            }).catch(error => {
+              console.error('An error occurred while editing the property', error);
+            }).finally(() => {
+              this.editing = false;
+            });
+          }
+
+          this.creating = false;
+        },
+        filters: initialFilters,
+        applyFilters() {
+          const filtersToApply = {};
+          Object.keys(this.filters).forEach(key => {
+            if (this.filters[key] !== '') {
+              filtersToApply[key] = this.filters[key];
+            }
+          });
+
+          const queryParams = new URLSearchParams(filtersToApply).toString();
+          const currentUrl = window.location.href;
+          const url = new URL(currentUrl);
+          url.search = queryParams;
+          window.location.href = url.toString();
+        },
+        clearFilters() {
+          this.filters = {
+            name__icontains: '',
+            address__icontains: '',
+            city__icontains: '',
+            country__icontains: '',
+            postal_code__icontains: '',
+            area__gte: '',
+            area__lte: '',
+            type__exact: ''
+          };
+
+          const currentUrl = window.location.href;
+          const url = new URL(currentUrl);
+          url.search = '';
+          window.location.href = url.toString();
+        }
+      }
+    }
+
+    function showPropertyDetails(id) {
+      this.selectedProperty = properties.find(property => property.id === id);
+
+
+    }
+  </script>
+{% endblock %}
