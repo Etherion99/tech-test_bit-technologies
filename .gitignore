@@ -1,0 +1,8 @@
+# IDES
+.idea
+
+# environments
+.venv
+
+# Django
+__pycache__/
